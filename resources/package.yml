@@ -1,0 +1,19 @@
+include:
+  - auth
+  - api
+  - logs
+  - websockets
+
+exclude:
+  - README.md
+  - Pipfile
+  - .env
+  - .gitignore
+  - .git
+  - serverless.yml
+  - scripts/**
+  - local.db/**
+  - infrastructure
+  - Pipfile.lock
+  - node_modules/**
+  - selenium/**

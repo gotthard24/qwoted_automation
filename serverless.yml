@@ -1,0 +1,186 @@
+service: qwoted-automation
+frameworkVersion: ">=3.38.0 <4.0.0"
+
+custom: ${file(resources/customs.yml)}
+
+provider:
+  profile: default
+  name: aws
+  runtime: python3.11
+  stage: dev
+  region: us-east-1
+  memorySize: 128
+  environment:
+    REGION: ${self:provider.region}
+    STAGE: ${self:custom.stage}
+    USER_POOL_ID: ${self:custom.userpoolId.${self:custom.stage}}
+    APP_CLIENT_ID: ${self:custom.appClientId.${self:custom.stage}}
+    LOG_LEVEL: ${self:custom.logLevel.${self:custom.stage}}
+  tags:
+    appName: ${self:custom.appName}
+    stage: ${self:custom.stage}
+    owner: Daniel Gorlovetsky
+  vpc:
+    securityGroupIds:
+      - Fn::GetAtt: [VPCStaticIP, DefaultSecurityGroup]
+    subnetIds:
+      - Ref: SubnetPrivate
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - ec2:CreateNetworkInterface
+        - ec2:DeleteNetworkInterface
+        - ec2:DescribeNetworkInterfaces
+      Resource: '*'
+
+
+package: ${file(resources/package.yml)}
+
+resources:
+  Resources:
+    # Resources created according to blog post:
+    # http://techblog.financialengines.com/2016/09/26/aws-lambdas-with-a-static-outgoing-ip/
+    
+    # Step 1: Create a new VPC
+    VPCStaticIP:
+      Type: AWS::EC2::VPC
+      Properties: 
+        CidrBlock: 11.0.0.0/16
+        Tags:
+          - Key: Name
+            Value: ${self:service}-${self:provider.stage}-vpc
+    
+    # Step 2: Create 2 Subnets
+    SubnetPublic:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: ${self:provider.region}b
+        CidrBlock: 11.0.0.0/24
+        Tags:
+          - Key: Name
+            Value: ${self:service}-${self:provider.stage}-public-subnet
+        VpcId:
+          Ref: VPCStaticIP
+
+    SubnetPrivate:
+      Type: AWS::EC2::Subnet
+      Properties:
+        AvailabilityZone: ${self:provider.region}b
+        CidrBlock: 11.0.1.0/24
+        Tags:
+          - Key: Name
+            Value: ${self:service}-${self:provider.stage}-private-subnet
+        VpcId:
+          Ref: VPCStaticIP
+    
+    # Step 3: Create an Internet Gateway
+    InternetGateway:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags:
+          - Key: Name
+            Value: ${self:service}-${self:provider.stage}-igw
+
+    # Attach Internet Gateway to VPC
+    VPCGatewayAttachment:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+        InternetGatewayId:
+          Ref: InternetGateway
+        VpcId:
+          Ref: VPCStaticIP
+  
+    # Step 4: Create a public Route Table and Assign it to our public route
+    RouteTablePublic:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId:
+          Ref: VPCStaticIP
+        Tags:
+          - Key: Name
+            Value: ${self:service}-${self:provider.stage}-public-route
+  
+    RoutePublic:
+      Type: AWS::EC2::Route
+      Properties:
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId:
+          Ref: InternetGateway
+        RouteTableId:
+          Ref: RouteTablePublic
+  
+    SubnetRouteTableAssociationPublic:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId:
+          Ref: RouteTablePublic
+        SubnetId:
+          Ref: SubnetPublic
+    
+    # Step 5: Create a NAT Gateway
+    # Before creating NAT Gateway, we need to create Elastic IP with vpc scope
+    EIP:
+      Type: AWS::EC2::EIP
+      Properties:
+        Domain: vpc
+  
+    NatGateway:
+      Type: AWS::EC2::NatGateway
+      Properties:
+        AllocationId:
+          Fn::GetAtt: [EIP, AllocationId]
+        SubnetId:
+          Ref: SubnetPublic
+
+    # In tutorial NAT Gateway is attached as default route 0.0.0.0/0 in main Route Table.
+    # Main Route Table is created implicitely during VPC creation and CloudFormation
+    # has no access to its ID. To overcome this limitation we create additional Route Table.
+    RouteTablePrivate:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId:
+          Ref: VPCStaticIP
+        Tags:
+          - Key: Name
+            Value: ${self:service}-${self:provider.stage}-private-route
+
+    RoutePrivate:
+      Type: AWS::EC2::Route
+      Properties:
+        DestinationCidrBlock: 0.0.0.0/0
+        NatGatewayId:
+          Ref: NatGateway
+        RouteTableId:
+          Ref: RouteTablePrivate
+
+    SubnetRouteTableMainAssociationPrivate:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId:
+          Ref: RouteTablePrivate
+        SubnetId:
+          Ref: SubnetPrivate
+
+functions:
+  qwoted-automation:
+    handler: qwoted.lambda_save_links_handler
+    events:
+      - schedule: cron(0 0 ? * * *)
+    layers:
+      - arn:aws:lambda:us-east-1:595294131160:layer:openai-bs4-webdriver_manager:1
+      - arn:aws:lambda:us-east-1:595294131160:layer:selenium_layer:2
+      - arn:aws:lambda:us-east-1:595294131160:layer:chromedriver:11
+  qwoted-pitch-automation:
+    handler: qwoted.lambda_pitch_handler
+    events:
+      - schedule: cron(5,30 0-2 ? * * *)
+    layers:
+      - arn:aws:lambda:us-east-1:595294131160:layer:openai-bs4-webdriver_manager:1
+      - arn:aws:lambda:us-east-1:595294131160:layer:selenium_layer:2
+      - arn:aws:lambda:us-east-1:595294131160:layer:chromedriver:11
+
+plugins:
+  - serverless-python-requirements
+  - serverless-iam-roles-per-function
+  - serverless-domain-manager
+  - serverless-prune-plugin

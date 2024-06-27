@@ -1,0 +1,38 @@
+pythonRequirements:
+  dockerizePip: non-linux # Change this if running in linux
+  usePipenv: true
+  noDeploy: []
+  useDownloadCache: true
+  useStaticCache: true
+stage: ${opt:stage, self:provider.stage}
+appName: qwoted-automation
+apiVersion: v1
+
+# On AWS buy the domain and verify it. Use ACM to generate a wildcard cert before running the plugin.
+# endpoint will be https://subdomain.mydomain.com/api/...path
+customDomain:
+  domainName: qwoted.tlvtech.io
+  stage: ${opt:stage, self:provider.stage}
+  basePath: api
+  createRoute53Record: true
+  certificateName: '*.tlvtech.io'
+  endpointType: 'regional'
+
+userpoolId:
+  local: ""
+  dev: ""
+  test: ""
+  stage: ""
+  prod: ""
+appClientId:
+  local: ""
+  dev: ""
+  test: ""
+  stage: ""
+  prod: ""
+logLevel:
+  local: DEBUG
+  dev: DEBUG
+  test: DEBUG
+  stage: WARNING
+  prod: WARNING
