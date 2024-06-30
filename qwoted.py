@@ -3,6 +3,7 @@ import random
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from airtable_funcs import get_all_records, update_record_status
+from make_funcs import get_records_todo, update_by_rec_id
 from dotenv import load_dotenv
 from save_funcs import login, search_with_random_hashtag, save_opportunities_to_db
 from pitch_funcs import get_query_description, validate_url, find_reporters_name, find_start_pitch_button, find_which_to_pitch_button, fill_pitch_text_area, click_submit
@@ -31,21 +32,24 @@ def lambda_save_links_handler(event, context):
 def lambda_pitch_handler(event, context):
     total_submitted = 0
     submit_limit = random.randint(4, 7)
+    
     login(driver)
     
     # Links to validate
-    all_records = get_all_records()
+    # all_records = get_all_records()
 
-    records_todo = [{'id': record['id'], **record['fields']} for record in all_records if 'URL' in record['fields'] and record['fields'].get('Status') == 'To do']
-
-    for record in records_todo:
+    # records_todo = [{'id': record['id'], **record['fields']} for record in all_records if 'URL' in record['fields'] and record['fields'].get('Status') == 'To do']
+    
+    todos = get_records_todo()
+    
+    for record in todos:
         print(f'{record}')
         record_id = record['id']
         url = record['URL']
 
         driver.get(url)
-        
-        is_valid_url = validate_url(driver, url)
+
+        is_valid_url = validate_url(driver, url, record_id)
         if is_valid_url == False: continue
 
         # Getting query description
@@ -80,7 +84,8 @@ def lambda_pitch_handler(event, context):
         # if not is_submit_btn_found: total_submitted += 1
         # else: continue
 
-        update_record_status(record_id, url, 'In progress')
+        # update_record_status(record_id, url, 'In progress')
+        update_by_rec_id(record_id, url, 'In progress')
         
         time.sleep(random.randint(5,10))
         print("Cycle completed successfully")
@@ -88,15 +93,15 @@ def lambda_pitch_handler(event, context):
         if total_submitted == submit_limit: 
             break
 
-    print(f"totalRelevantLinks: {len(records_todo)}")
+    print(f"totalRelevantLinks: {len(todos)}")
     print(f"totalSubmitted: {total_submitted}")
     response = {
             "statusCode": 200,
             "body": {
                 "message": "Operation completed successfully",
-                "totalRelevantLinks": len(records_todo),
+                "totalRelevantLinks": len(todos),
                 "total_submitted": total_submitted,
-                "linksSample": records_todo[:5]  # Return up to 5 links as a sample
+                "linksSample": todos[:5]  # Return up to 5 links as a sample
             }
         }
     # Close the browser

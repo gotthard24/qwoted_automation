@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 from GPT_api import openai_api_call
 from airtable_funcs import add_record_to_airtable
+from make_funcs import add_record
 
 def login(driver):
     ### Email & Pass from dotenv ###
@@ -137,7 +138,8 @@ def save_opportunities_to_db(driver):
                 
                 if int(gpt_query_pitch) >= 5:              
                     try:
-                        add_record_to_airtable('https://app.qwoted.com' + link['href'])
+                        # add_record_to_airtable('https://app.qwoted.com' + link['href'])
+                        add_record('https://app.qwoted.com' + link['href'])
                         relevant_links += 1
                     except:
                         print("Issue during adding a link to db")

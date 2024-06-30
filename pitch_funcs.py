@@ -1,4 +1,5 @@
 from airtable_funcs import delete_record_by_url
+from make_funcs import delete_by_rec_id
 from GPT_api import openai_api_call
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
@@ -6,7 +7,7 @@ from bs4 import BeautifulSoup
 import time
 import random
 
-def validate_url(driver, url):
+def validate_url(driver, url, record_id):
     is_valid = False
     xpath_of_previous_source_request = "//h3[@class='fw-bold my-2' and contains(text(), 'Previous Source Requests')]"
     previous_source_requests_element = driver.find_elements(By.XPATH, xpath_of_previous_source_request)
@@ -18,7 +19,8 @@ def validate_url(driver, url):
     
     if previous_source_requests_element:
         print("Previous source requests found... Continuing to the next one...")
-        delete_record_by_url(url)
+        # delete_record_by_url(url)
+        delete_by_rec_id(record_id)
 
     else:
         print("Previous source requests not found!")
