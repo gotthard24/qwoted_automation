@@ -6,6 +6,7 @@ from selenium.common.exceptions import NoSuchElementException
 from bs4 import BeautifulSoup 
 import time
 import random
+import json
 
 def validate_url(driver, url, record_id):
     is_valid = False
@@ -126,6 +127,7 @@ def fill_pitch_text_area(driver, query_description, query_reporter_name):
         
     pitch_text_form = driver.find_element(By.XPATH, "//*[@id='pitch_text']")
     pitch_text_form.send_keys(gpt_query_pitch)
+    return gpt_query_pitch
     
     
 def click_submit(driver):
@@ -138,3 +140,23 @@ def click_submit(driver):
     except NoSuchElementException:
         print(f"Failed clicking the submit element. Skipping.")
     return is_found
+
+
+def summary_and_quit(driver, todos, total_submitted):
+    print(f"totalRelevantLinks: {len(todos)}")
+    print(f"totalSubmitted: {total_submitted}")
+    response = {
+            "statusCode": 200,
+            "body": {
+                "message": "Operation completed successfully",
+                "totalRelevantLinks": len(todos),
+                "total_submitted": total_submitted,
+                "linksSample": todos[:5]  # Return up to 5 links as a sample
+            }
+        }
+    # Close the browser
+    time.sleep(5)
+    driver.quit()
+
+    response["body"] = json.dumps(response["body"])
+    return response

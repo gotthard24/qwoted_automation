@@ -7,7 +7,7 @@ from GPT_api import openai_api_call
 from airtable_funcs import add_record_to_airtable
 from make_funcs import add_record
 
-def login(driver):
+def login(driver, options, actions):
     ### Email & Pass from dotenv ###
     Email = os.getenv("Email")
     Pass = os.getenv("Pass")
@@ -16,6 +16,11 @@ def login(driver):
     print(f'Navigating to login')
     # Navigate to the webpagea
     driver.get("https://app.qwoted.com/users/sign_in")
+    
+    time.sleep(random.randint(2,5))
+    
+    referer = "https://app.qwoted.com/users/sign_in"
+    options.add_argument(f'referer={referer}') 
 
     page_source_login = driver.page_source
 
@@ -23,11 +28,17 @@ def login(driver):
         print(f'Logging in')
         # Locate the email input field and send the keys to it
         email_input = driver.find_element(By.ID, "email")
+        actions.move_to_element(email_input).perform()
+        time.sleep(random.randint(1,3))
+        actions.click(email_input).perform()
         email_input.clear()  # Clears any pre-filled text in the input field
         email_input.send_keys(Email)
 
         # Locate the password input field and send the keys to it
         password_input = driver.find_element(By.ID, "password")
+        actions.move_to_element(password_input).perform()
+        time.sleep(random.randint(1,3))
+        actions.click(password_input).perform()
         password_input.clear()  # Clears any pre-filled text in the input field
         password_input.send_keys(Pass)
 
@@ -35,35 +46,65 @@ def login(driver):
         login_button = driver.find_element(By.CSS_SELECTOR, "button.btn.btn-primary.no-border.btn-lg.mb-1")
 
         # Click on the "Login" button
-        login_button.click()
+        actions.move_to_element(login_button).perform()
+        time.sleep(random.randint(1,3))
+        actions.click(login_button).perform()
         
-        time.sleep(3)
+        time.sleep(random.randint(2,4))
         
         page_source_login = driver.page_source
         
-        print('Smth went wrong during logging in' if "Your latest stats" not in page_source_login else 'I am in')    
+        print('Smth went wrong during logging in' if "Your latest stats" not in page_source_login else 'I am in')   
     
     
-def search_with_random_hashtag(driver):
+def search_with_random_hashtag(driver, options, actions):
     hashtags = ["AI", "ArtificialIntelligence", "AITechnologies", 
     "Cybersecurity", "AppDevelopment", "CTO", "CIO", 
     "ChiefTechnologyOfficer", "InformationTechnology", 'CloudComputing', "BigData", "SoftwareDeveloper",
     "InformationSecurity", "MachineLearning", "Blockchain", "DataSecurity", "DigitalTransformation"]
     
     hashtag = random.choice(hashtags)
-
     
     # Navigate to the search page
-    driver.get("https://app.qwoted.com/source_requests/search")
-
-    time.sleep(5)
+    opportunities_btn = driver.find_element(By.XPATH, "/html/body/nav[1]/div/div/ul[1]/li[1]/a")
+    actions.move_to_element(opportunities_btn).perform()
+    time.sleep(random.randint(0,2))
+    actions.click(opportunities_btn).perform()
+    time.sleep(1)
+    
+    # driver.get("https://app.qwoted.com/source_requests/search")
+    
+    referer = "https://app.qwoted.com/source_requests/"
+    options.add_argument(f'referer={referer}') 
+    
+    advanced_search_btn = driver.find_element(By.XPATH, "/html/body/div[3]/div/div/div[2]/div/div[2]/div/div[1]/div[1]/ul/li[5]/a")
+    actions.move_to_element(advanced_search_btn).perform()
+    time.sleep(random.randint(0,2))
+    actions.click(advanced_search_btn).perform()
+    time.sleep(random.randint(2,5))
+    
+    referer = "https://app.qwoted.com/source_requests/search"
+    options.add_argument(f'referer={referer}') 
 
     print(f'Free to pitch')
+    first_company_div = driver.find_element(By.XPATH, "/html/body/div[3]/div/div/div[2]/div/div[2]/div/div[3]/div[2]/div[1]/div[1]/div/div[1]")
+    actions.move_to_element(first_company_div).perform()
+    time.sleep(random.randint(0,2))
+    
+    status_filter_div = driver.find_element(By.XPATH, "/html/body/div[3]/div/div/div[2]/div/div[2]/div/div[3]/div[1]/div[2]/div")
+    actions.move_to_element(status_filter_div).perform()
+    time.sleep(random.randint(0,2))
+    
     Free_To_Pitch_checkbox = driver.find_element(By.CSS_SELECTOR, "input.ais-ToggleRefinement-checkbox")
-    Free_To_Pitch_checkbox.click()
+    actions.move_to_element(Free_To_Pitch_checkbox).perform()
+    time.sleep(random.randint(0,2))
+    actions.click(Free_To_Pitch_checkbox).perform()
+    time.sleep(1)
     print(f'Search')
     # Locate the search input
     search_input = driver.find_element(By.XPATH, "//input[@placeholder='Search here…']")
+    actions.move_to_element(search_input).perform()
+    time.sleep(random.randint(0,2))
 
     # Locate the second search box button
     search_box_button = driver.find_element(By.XPATH, "/html/body/div[3]/div/div/div[2]/div/div[2]/div/div[3]/div[1]/div[5]/div/div/div[2]/div/div/div/form/button[1]")
@@ -73,7 +114,10 @@ def search_with_random_hashtag(driver):
     search_input.send_keys(hashtag)
     time.sleep(random.randint(2,5))
     print(f'Search')
-    search_box_button.click()
+    
+    actions.move_to_element(search_box_button).perform()
+    time.sleep(random.randint(0,2))
+    actions.click(search_box_button).perform()
     time.sleep(random.randint(2,5))
 
     num_of_scrolls = 1 # To get more cards
@@ -101,10 +145,21 @@ def save_opportunities_to_db(driver):
     for card in cards:
         # Check for badges indicating "Submitted" or "Read by Reporter"
         badge = card.find('span', class_=['badge bg-info', 'badge bg-success', 'badge bg-warning text-white'])
-        meet_the_media = card.find('i', class_=['fas fa-message'])
+        company_name_element = card.find('h6', class_=['w-75 mb-0 fw-bold mt-2 mb-0'])
+        company_name = company_name_element.text.strip() if company_name_element else None
+        deadline_element = card.find('div', class_=['font-size-12px source-request-deadline'])
+        deadline_warning_element = card.find('div', class_=['text-warning fst-italic font-size-12px source-request-deadline'])
+        deadline_danger_element = card.find('div', class_=['text-danger fst-italic font-size-12px source-request-deadline'])
+        deadline_regular = deadline_element.text.strip() if  deadline_element else None
+        deadline_warning = deadline_warning_element.text.strip() if  deadline_warning_element else None
+        deadline_danger = deadline_danger_element.text.strip() if  deadline_danger_element else None
+        deadline = deadline_regular if deadline_element else deadline_warning if deadline_warning_element else deadline_danger if deadline_danger_element else None
         badge_text = badge.get_text().strip() if badge else "No Footer"
 
-        print(meet_the_media)
+        # print('meet the media:', meet_the_media)
+        print("company name", company_name)
+        print("deadline", deadline)
+        
         if badge_text not in ["Submitted", "Read by Reporter"]:
             print(badge_text)
             
@@ -136,10 +191,11 @@ def save_opportunities_to_db(driver):
                 gpt_query_pitch = openai_api_call(check_prompt)
                 print('GPT answer: ', gpt_query_pitch)
                 
-                if int(gpt_query_pitch) >= 5:              
+                if int(gpt_query_pitch) >= 5: 
+                    url = 'https://app.qwoted.com' + link['href']           
                     try:
                         # add_record_to_airtable('https://app.qwoted.com' + link['href'])
-                        add_record('https://app.qwoted.com' + link['href'])
+                        add_record(company_name, url, gpt_query_pitch, deadline)
                         relevant_links += 1
                     except:
                         print("Issue during adding a link to db")

@@ -1,12 +1,13 @@
 import time
 import random
 from selenium import webdriver
+from selenium.webdriver import ActionChains
 from selenium.webdriver.chrome.options import Options
 from airtable_funcs import get_all_records, update_record_status
 from make_funcs import get_records_todo, update_by_rec_id
 from dotenv import load_dotenv
 from save_funcs import login, search_with_random_hashtag, save_opportunities_to_db
-from pitch_funcs import get_query_description, validate_url, find_reporters_name, find_start_pitch_button, find_which_to_pitch_button, fill_pitch_text_area, click_submit
+from pitch_funcs import get_query_description, validate_url, find_reporters_name, find_start_pitch_button, find_which_to_pitch_button, fill_pitch_text_area, click_submit, summary_and_quit
 
 load_dotenv()
 
@@ -16,15 +17,26 @@ options = Options()
 # options.add_argument('--no-sandbox')
 # options.add_argument('--single-process')
 # options.add_argument('--disable-dev-shm-usage')
+
+user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+options.add_argument(f'user-agent={user_agent}')
+
+referer = "http://google.com"
+options.add_argument(f'referer={referer}')
 # # options.binary_location = '/opt/headless-chromium'
 
 # Setup the Chrome driver with the specified options and the path to the binary in the Lambda Layer
 driver = webdriver.Chrome(options=options)
 
+#Actions for performing cursor movement like it is a real person
+actions = ActionChains(driver)
+# Hiding navigator.webdriver
+driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+
 def lambda_save_links_handler(event, context):
-    login(driver)
+    login(driver, options, actions)  
     time.sleep(random.randint(1,3))
-    search_with_random_hashtag(driver)
+    search_with_random_hashtag(driver, options, actions)
     time.sleep(random.randint(1,3))
     save_opportunities_to_db(driver)
     
@@ -33,7 +45,7 @@ def lambda_pitch_handler(event, context):
     total_submitted = 0
     submit_limit = random.randint(4, 7)
     
-    login(driver)
+    login(driver, options, actions)
     
     # Links to validate
     # all_records = get_all_records()
@@ -46,8 +58,16 @@ def lambda_pitch_handler(event, context):
         print(f'{record}')
         record_id = record['id']
         url = record['URL']
+        fit = record['Fit']
+        company_name = record['Name']
+        deadline = record['Deadline']
+        status = 'In progress'
 
         driver.get(url)
+        
+        #Setting previous page 
+        referer = url
+        options.add_argument(f'referer={referer}')
 
         is_valid_url = validate_url(driver, url, record_id)
         if is_valid_url == False: continue
@@ -75,17 +95,18 @@ def lambda_pitch_handler(event, context):
         time.sleep(random.randint(2,5))
 
         # Filling text area with OpenAI api 
-        fill_pitch_text_area(driver, query_description, query_reporter_name)
+        gpt_response = fill_pitch_text_area(driver, query_description, query_reporter_name)
 
         time.sleep(random.randint(2,5))
         
         # # Finding Submit button
         # is_submit_btn_found = click_submit(driver)
-        # if not is_submit_btn_found: total_submitted += 1
+        
+        # if is_submit_btn_found: total_submitted += 1
         # else: continue
 
         # update_record_status(record_id, url, 'In progress')
-        update_by_rec_id(record_id, url, 'In progress')
+        update_by_rec_id(record_id, company_name, url, fit, deadline, status, gpt_response)
         
         time.sleep(random.randint(5,10))
         print("Cycle completed successfully")
@@ -93,23 +114,7 @@ def lambda_pitch_handler(event, context):
         if total_submitted == submit_limit: 
             break
 
-    print(f"totalRelevantLinks: {len(todos)}")
-    print(f"totalSubmitted: {total_submitted}")
-    response = {
-            "statusCode": 200,
-            "body": {
-                "message": "Operation completed successfully",
-                "totalRelevantLinks": len(todos),
-                "total_submitted": total_submitted,
-                "linksSample": todos[:5]  # Return up to 5 links as a sample
-            }
-        }
-    # Close the browser
-    time.sleep(5)
-    driver.quit()
-    import json
-    response["body"] = json.dumps(response["body"])
-
+    response = summary_and_quit(driver, todos, total_submitted)
     # Return the response object
     return response
 

@@ -12,9 +12,12 @@ def get_records_todo():
         print(f"Error: {response.status_code}")
         
 
-def add_record(url):
+def add_record(name, url, fit, deadline):
     webhook_url = 'https://hook.eu1.make.com/8elo632g1i9w3mpandntzwydsxux73vb'
-    data = {"url": url}
+    data = {"name": name,
+            "url": url,
+            "fit": fit,
+            "deadline": deadline}
 
     response = requests.post(webhook_url, json=data)
 
@@ -36,11 +39,15 @@ def delete_by_rec_id(rec_id):
         print(f"Error: {response.status_code}")
         
 
-def update_by_rec_id(rec_id, url, status):
+def update_by_rec_id(rec_id, name, url, fit, deadline, status, gpt_response):
     webhook_url = 'https://hook.eu1.make.com/8elo632g1i9w3mpandntzwydsxux73vb'
     data = {"record_id": rec_id,
+            "name": name,
             "url": url,
-            "status": status}
+            "fit": fit,
+            "deadline": deadline,
+            "status": status,
+            "response": gpt_response}
 
     response = requests.post(webhook_url, json=data)
 
